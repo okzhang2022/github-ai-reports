@@ -1,0 +1,104 @@
+name: GitHub AI reports
+on:
+  schedule:
+    # UTC 16:05 = 北京时间次日 00:05，积累每日快照。
+    - cron: '5 16 * * *'
+    # UTC 01:00 = 北京时间 09:00；20/40 分为失败重试，发送标记避免常规重复。
+    - cron: '0,20,40 1 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '首次选择 snapshot；配置完成后选择 report 测试发布和邮件'
+        type: choice
+        options: [snapshot, report]
+        default: snapshot
+      kind:
+        description: 'auto 按当天日期决定；其他选项生成上一完整自然周期'
+        type: choice
+        options: [auto, weekly, monthly, yearly]
+        default: auto
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: github-ai-reports
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      MODEL: ${{ vars.MODEL }}
+      SITE_URL: ${{ vars.SITE_URL }}
+      SMTP_HOST: ${{ vars.SMTP_HOST }}
+      SMTP_PORT: ${{ vars.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      MAIL_FROM: ${{ secrets.MAIL_FROM }}
+      MAIL_TO: ${{ secrets.MAIL_TO }}
+      REPORT_KIND: ${{ inputs.kind || 'auto' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate
+        run: python -m unittest discover -s tests -v
+      - name: Daily snapshot
+        if: github.event.schedule == '5 16 * * *' || inputs.mode == 'snapshot'
+        run: python src/report.py snapshot
+      - name: Check report date
+        id: due
+        run: |
+          python - <<'PYDATE'
+          import datetime, os
+          from zoneinfo import ZoneInfo
+          d = datetime.datetime.now(ZoneInfo('Asia/Shanghai')).date()
+          due = os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch' or d.weekday() == 0 or d.day == 1
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write('report=' + str(due).lower() + '\n')
+          PYDATE
+      - name: Build reports
+        id: build
+        if: steps.due.outputs.report == 'true' && github.event.schedule != '5 16 * * *' && inputs.mode != 'snapshot'
+        run: python src/report.py build --kind "$REPORT_KIND"
+      - name: Persist snapshots and reports
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add data site
+          if ! git diff --cached --quiet; then
+            git commit -m "Update GitHub AI report data"
+            git push
+          fi
+      - uses: actions/configure-pages@v5
+        if: steps.build.outcome == 'success'
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.build.outcome == 'success'
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: deploy
+        if: steps.build.outcome == 'success'
+      - name: Send email after successful deployment
+        if: steps.deploy.outcome == 'success'
+        run: python src/report.py notify --kind "$REPORT_KIND"
+      - name: Persist delivery receipts
+        if: always()
+        run: |
+          git add data
+          if ! git diff --cached --quiet; then
+            git commit -m "Record email delivery receipts"
+            git push
+          fi
+      - name: Notify failure
+        if: failure()
+        env:
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python src/failure_mail.py

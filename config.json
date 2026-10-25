@@ -1,0 +1,11 @@
+{
+  "timezone": "Asia/Shanghai",
+  "topics": ["artificial-intelligence", "machine-learning", "llm", "generative-ai", "ai-agent", "agent-skills"],
+  "pages_per_topic": 2,
+  "min_stars": 100,
+  "max_candidates": 1500,
+  "pinned_repositories": ["mattpocock/skills", "cathrynlavery/diagram-design", "heygen-com/hyperframes"],
+  "model": "",
+  "site_url": "",
+  "interests": "前端开发、Agent/Skill、PRD 到代码实现、代码 Review、上下文管理、架构与方案可视化"
+}
