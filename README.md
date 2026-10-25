@@ -1,13 +1,17 @@
 # GitHub AI 云端报告
 
-已准备好可部署工程，**尚未连接 GitHub、调用模型、发布 Pages 或发送真实邮件**。无需电脑持续开机；代码在 GitHub Actions 执行。
+仓库已创建，GitHub Pages 已发布，首次云端采集已成功（2026-10-25，1053 个候选）。**模型 API 调用与真实邮件投递尚未验证，等待补齐密钥。** 无需电脑持续开机；代码在 GitHub Actions 执行。
+
+报告站点：https://okzhang2022.github.io/github-ai-reports/
+
+当前待配置：Secrets `SMTP_PASSWORD`、`OPENAI_API_KEY`；Variables `MODEL`。163 的 SMTP 主机、465 端口及收发邮箱已配置。
 
 ## 你需要配置的内容
 
 1. 一个你有管理权限的 GitHub 仓库。最容易部署的是新建公开仓库，例如 `github-ai-reports`。代码、快照、报告、README 证据都会公开；API Key、邮箱、SMTP 密码只放 Secrets。若选私有仓库，先确认你的 GitHub 套餐支持该仓库的 Pages，以及网站访问范围，私有仓库不意味着 Pages 网站私有。
 2. 一个可用的 OpenAI API Key 和模型 ID。ChatGPT 订阅不能代替 API 账户计费。模型需要支持 Responses API 的 JSON 对象输出；每期最多整理十份 README，可能产生 API 费用。这里不预填未经验证的模型 ID，请在 API 账户中选择你实际可用的模型。
 3. 一个支持 SMTP 的发件邮箱、SMTP 服务器地址、端口和应用专用密码/SMTP 授权码，以及收件邮箱。邮箱密码不要发到聊天中。优先用 465 SSL；587 使用 STARTTLS，不支持明文发送。
-4. 初次部署和联调需要你登录 GitHub。目前此电脑 `gh auth status` 显示凭据失效，未替你创建或修改远程仓库。
+4. GitHub 已完成登录并授权公开发布。本仓库已经创建；下面的新建命令仅供重新部署参考，无需重复执行。
 
 ## 上传代码
 
@@ -29,7 +33,7 @@ gh repo create github-ai-reports --public --source=. --remote=origin --push
 
 进入新仓库：
 
-- **Settings → Actions → General → Workflow permissions**：允许工作流读写仓库。组织策略或分支保护若拒绝机器人推送，需要为数据持久化配置允许的分支或相应权限；不要直接关闭组织保护。
+- 工作流通过 YAML 显式声明保存数据所需权限，已验证可推送快照，无需扩大仓库所有工作流的默认权限。组织策略或分支保护若拒绝机器人推送，应检查对应规则，不要直接关闭组织保护。
 - **Settings → Pages → Build and deployment → Source**：选择 **GitHub Actions**。
 - **Settings → Secrets and variables → Actions**：按下面的表配置。
 - 如 `github-pages` Environment 要求人工审批，每次发布会等待审批。全自动部署需设置适合该仓库的部署规则。
@@ -115,4 +119,4 @@ python -m py_compile src/report.py src/failure_mail.py
 - [Repository Search API](https://docs.github.com/en/rest/search/search#search-repositories)
 - [OpenAI Responses API](https://platform.openai.com/docs/api-reference/responses/create)
 
-本地环境本轮无法连通官方文档及外部 API，因此这些是配置参考入口；真实服务兼容性、账户权限、API 和投递结果必须在首次联调中确认。
+已验证 GitHub API 采集、Actions 数据持久化和 Pages HTTP 200。首次部署测试因缺少 SMTP 授权码停在邮件检查；模型接口和投递结果仍需在补齐配置后联调确认。
